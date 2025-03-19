@@ -22,33 +22,25 @@ class TaskListCreateView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         assigned_to = request.data.get('assigned_to')
-
-        # Ensure assigned_to is provided and valid
         if not assigned_to:
             return Response({"message": "Assigned user is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            assigned_to = int(assigned_to)  # Convert to integer for comparison
+            assigned_to = int(assigned_to)  
         except ValueError:
             return Response({"message": "Invalid user ID."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check if the assigned user exists
         if not CustomUser.objects.filter(id=assigned_to).exists():
             return Response({"message": "Assigned user does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Prevent users from assigning tasks to themselves
         if assigned_to == request.user.id:
             return Response({"message": "You cannot assign tasks to yourself."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Automatically assign the logged-in user
         request.data['assigned_by'] = request.user.id
 
         return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
         queryset = super().get_queryset()
-
-        # Filter tasks by the logged-in user (if requested)
         if self.request.query_params.get('assigned_by') == 'me':
             queryset = queryset.filter(assigned_by=self.request.user)
 
@@ -106,8 +98,6 @@ class RateLimitedView(views.APIView):
     def get(self, request):
         client_id = self.get_client_identifier(request)
         cache_key = f"rate_limit:{client_id}"
-        
-        # Get current request count
         request_count = cache.get(cache_key, 0)
 
         if request_count >= self.RATE_LIMIT:
@@ -116,7 +106,6 @@ class RateLimitedView(views.APIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS
             )
 
-        # Increment the request count and set timeout
         cache.set(cache_key, request_count + 1, timeout=self.TIME_WINDOW)
 
         return Response({"message": "Request successful!"})
